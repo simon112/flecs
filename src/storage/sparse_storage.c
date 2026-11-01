@@ -129,10 +129,6 @@ static ecs_entity_t flecs_component_sparse_remove_intern(
     ecs_assert(cr->flags & EcsIdSparse, ECS_INTERNAL_ERROR, NULL);
     flecs_storage_change(world);
 
-    if (cr->flags & EcsIdDontFragment) {
-        /* Removing a DontFragment component changes no table rows */
-        world->storage_version ++;
-    }
 
     ecs_entity_t entity = ecs_table_entities(table)[row];
     const ecs_type_info_t *ti = cr->type_info;
@@ -216,10 +212,6 @@ void flecs_component_sparse_remove(
     ecs_flags32_t flags = cr->flags;
     bool dont_fragment = flags & EcsIdDontFragment;
 
-    if (dont_fragment) {
-        /* Removing a DontFragment component changes no table rows */
-        world->storage_version ++;
-    }
 
     /* If id is a wildcard, remove entity from all matching ids. */
     if (dont_fragment && ecs_id_is_wildcard(cr->id)) {
@@ -349,7 +341,6 @@ void flecs_component_sparse_remove_all(
     flecs_storage_change(world);
     ecs_assert(cr->flags & EcsIdDontFragment, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(cr->sparse != NULL, ECS_INTERNAL_ERROR, NULL);
-    world->storage_version ++;
 
     ecs_id_t component_id = cr->id;
     if (ecs_id_is_wildcard(component_id)) {

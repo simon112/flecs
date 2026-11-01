@@ -231,10 +231,19 @@ void flecs_emit_walks_capture(
 /* Storage changes only after the write barrier captured any open walk. */
 void flecs_emit_walks_assert_captured(
     const ecs_world_t *world);
-#define flecs_storage_change(world) flecs_emit_walks_assert_captured(world)
+#define flecs_storage_change_check(world) flecs_emit_walks_assert_captured(world)
 #else
-#define flecs_storage_change(world)
+#define flecs_storage_change_check(world)
 #endif
+
+/* Every function that moves storage (rows, a non-fragmenting hierarchy, a
+ * DontFragment component, a component record) calls this. While
+ * storage_version is unchanged an event's deliveries are where they were
+ * planned and the records it holds are alive. */
+#define flecs_storage_change(world_arg) do {\
+        ECS_CONST_CAST(ecs_world_t*, (world_arg))->storage_version ++;\
+        flecs_storage_change_check(world_arg);\
+    } while (0)
 
 
 /* Get current stage. */

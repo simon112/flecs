@@ -1256,7 +1256,6 @@ void flecs_increment_table_version(
     ecs_assert(table != NULL, ECS_INVALID_PARAMETER, NULL);
 
     world->table_version[table->id & ECS_TABLE_VERSION_ARRAY_BITMASK] ++;
-    world->storage_version ++;
     table->version ++;
 }
 

@@ -80,8 +80,6 @@ void flecs_ordered_entities_append(
     ecs_vec_init_if_t(vec, ecs_entity_t);
     ecs_vec_append_t(&world->allocator, vec, ecs_entity_t)[0] = e;
 
-    /* A child that changes parent stays in its table */
-    world->storage_version ++;
 
     if (cr->flags & EcsIdPrefabChildren) {
         /* Register index of prefab child so that it can be used to lookup
@@ -116,7 +114,6 @@ void flecs_ordered_entities_remove(
     ecs_assert(i != count, ECS_INTERNAL_ERROR, NULL);
 
     ecs_vec_remove_ordered_t(vec, ecs_entity_t, i);
-    world->storage_version ++;
     if (cr->flags & EcsIdPrefabChildren) {
         ecs_map_remove(&world->prefab_child_indices, e);
     }

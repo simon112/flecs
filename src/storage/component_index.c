@@ -688,7 +688,7 @@ static void flecs_component_free(
 
     /* An event in progress holds records across observer calls: it fetches
      * them again when the version changed */
-    world->storage_version ++;
+    flecs_storage_change(world);
 
     if (ecs_should_log_1()) {
         char *id_str = ecs_id_str(world, id);

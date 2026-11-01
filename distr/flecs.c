@@ -4230,10 +4230,19 @@ void flecs_emit_walks_capture(
 /* Storage changes only after the write barrier captured any open walk. */
 void flecs_emit_walks_assert_captured(
     const ecs_world_t *world);
-#define flecs_storage_change(world) flecs_emit_walks_assert_captured(world)
+#define flecs_storage_change_check(world) flecs_emit_walks_assert_captured(world)
 #else
-#define flecs_storage_change(world)
+#define flecs_storage_change_check(world)
 #endif
+
+/* Every function that moves storage (rows, a non-fragmenting hierarchy, a
+ * DontFragment component, a component record) calls this. While
+ * storage_version is unchanged an event's deliveries are where they were
+ * planned and the records it holds are alive. */
+#define flecs_storage_change(world_arg) do {\
+        ECS_CONST_CAST(ecs_world_t*, (world_arg))->storage_version ++;\
+        flecs_storage_change_check(world_arg);\
+    } while (0)
 
 /* Get current stage. */
 ecs_stage_t* flecs_stage_from_world(
@@ -23813,7 +23822,6 @@ void flecs_increment_table_version(
     ecs_assert(table != NULL, ECS_INVALID_PARAMETER, NULL);
 
     world->table_version[table->id & ECS_TABLE_VERSION_ARRAY_BITMASK] ++;
-    world->storage_version ++;
     table->version ++;
 }
 
@@ -40580,7 +40588,7 @@ static void flecs_component_free(
 
     /* An event in progress holds records across observer calls: it fetches
      * them again when the version changed */
-    world->storage_version ++;
+    flecs_storage_change(world);
 
     if (ecs_should_log_1()) {
         char *id_str = ecs_id_str(world, id);
@@ -41935,9 +41943,6 @@ void flecs_ordered_entities_append(
     ecs_vec_init_if_t(vec, ecs_entity_t);
     ecs_vec_append_t(&world->allocator, vec, ecs_entity_t)[0] = e;
 
-    /* A child that changes parent stays in its table */
-    world->storage_version ++;
-
     if (cr->flags & EcsIdPrefabChildren) {
         /* Register index of prefab child so that it can be used to lookup
          * corresponding instance child. */
@@ -41971,7 +41976,6 @@ void flecs_ordered_entities_remove(
     ecs_assert(i != count, ECS_INTERNAL_ERROR, NULL);
 
     ecs_vec_remove_ordered_t(vec, ecs_entity_t, i);
-    world->storage_version ++;
     if (cr->flags & EcsIdPrefabChildren) {
         ecs_map_remove(&world->prefab_child_indices, e);
     }
@@ -42233,11 +42237,6 @@ static ecs_entity_t flecs_component_sparse_remove_intern(
     ecs_assert(cr->flags & EcsIdSparse, ECS_INTERNAL_ERROR, NULL);
     flecs_storage_change(world);
 
-    if (cr->flags & EcsIdDontFragment) {
-        /* Removing a DontFragment component changes no table rows */
-        world->storage_version ++;
-    }
-
     ecs_entity_t entity = ecs_table_entities(table)[row];
     const ecs_type_info_t *ti = cr->type_info;
 
@@ -42319,11 +42318,6 @@ void flecs_component_sparse_remove(
     ecs_id_t id = cr->id;
     ecs_flags32_t flags = cr->flags;
     bool dont_fragment = flags & EcsIdDontFragment;
-
-    if (dont_fragment) {
-        /* Removing a DontFragment component changes no table rows */
-        world->storage_version ++;
-    }
 
     /* If id is a wildcard, remove entity from all matching ids. */
     if (dont_fragment && ecs_id_is_wildcard(cr->id)) {
@@ -42453,7 +42447,6 @@ void flecs_component_sparse_remove_all(
     flecs_storage_change(world);
     ecs_assert(cr->flags & EcsIdDontFragment, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(cr->sparse != NULL, ECS_INTERNAL_ERROR, NULL);
-    world->storage_version ++;
 
     ecs_id_t component_id = cr->id;
     if (ecs_id_is_wildcard(component_id)) {
