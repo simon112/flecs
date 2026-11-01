@@ -107,6 +107,13 @@ static void flecs_inc_observer_count(
     int32_t value,
     bool up_notify)
 {
+    if (world->emit_walk) {
+        /* An event walking storage skips the observer sets that were empty
+         * when it started: once captured, it plans every set, and delivery
+         * reads them as they are then */
+        flecs_emit_walks_capture(world);
+    }
+
     ecs_event_id_record_t *idt = flecs_event_id_record_ensure(world, evt, id);
     ecs_assert(idt != NULL, ECS_INTERNAL_ERROR, NULL);
 
@@ -147,7 +154,14 @@ static void flecs_inc_observer_count(
 
     if (result == 0) {
         flecs_event_id_record_remove(evt, id);
-        ecs_os_free(idt);
+        if (world->emit_depth) {
+            /* Deliveries of the events in progress may point at it */
+            ecs_vec_init_if_t(&world->allocators.emit_freed, void*);
+            ecs_vec_append_t(&world->allocator,
+                &world->allocators.emit_freed, void*)[0] = idt;
+        } else {
+            ecs_os_free(idt);
+        }
     }
 
     if (ECS_PAIR_FIRST(id) == EcsChildOf) {
@@ -361,7 +375,7 @@ static void flecs_observer_invoke(
     }
 }
 
-static void flecs_uni_observer_invoke(
+static inline FLECS_ALWAYS_INLINE void flecs_uni_observer_invoke(
     ecs_world_t *world,
     ecs_observer_t *o,
     ecs_iter_t *it,
@@ -482,11 +496,14 @@ static void flecs_uni_observer_invoke(
     world->info.observers_ran_total ++;
 }
 
-typedef enum flecs_observers_invoke_mode_t {
-    FlecsObserversInvokeAll,
-    FlecsObserversInvokeUpNotifyOnly,
-    FlecsObserversInvokeSkipUpNotify
-} flecs_observers_invoke_mode_t;
+void flecs_observer_invoke_one(
+    ecs_world_t *world,
+    ecs_observer_t *o,
+    ecs_iter_t *it,
+    ecs_entity_t trav)
+{
+    flecs_uni_observer_invoke(world, o, it, it->table, trav);
+}
 
 static ecs_table_t* flecs_observer_lock_table(
     const ecs_iter_t *it,
@@ -498,16 +515,18 @@ static ecs_table_t* flecs_observer_lock_table(
     return NULL;
 }
 
-static void flecs_observers_invoke_intern(
+void flecs_observers_deliver(
     ecs_world_t *world,
     ecs_map_t *observers,
     ecs_iter_t *it,
-    ecs_table_t *table,
+    ecs_table_t *lock_table,
     ecs_entity_t trav,
-    flecs_observers_invoke_mode_t mode)
+    flecs_observers_invoke_mode_t mode,
+    const uint64_t *version,
+    flecs_observer_moved_t moved,
+    void *moved_ctx)
 {
     if (ecs_map_is_init(observers)) {
-        ecs_table_t *lock_table = flecs_observer_lock_table(it, table);
         (void)lock_table;
         ECS_TABLE_LOCK(it->world, lock_table);
 
@@ -524,8 +543,12 @@ static void flecs_observers_invoke_intern(
                 continue;
             }
 
-            ecs_assert(it->table == table, ECS_INTERNAL_ERROR, NULL);
-            flecs_uni_observer_invoke(world, o, it, table, trav);
+            if (version && *version != world->storage_version) {
+                /* An observer moved the event's targets */
+                moved(world, o, moved_ctx);
+            } else {
+                flecs_uni_observer_invoke(world, o, it, it->table, trav);
+            }
 
             ecs_assert(ecs_map_iter_valid(&oit), ECS_INVALID_OPERATION,
                 "observer list modified while notifying: "
@@ -534,6 +557,19 @@ static void flecs_observers_invoke_intern(
 
         ECS_TABLE_UNLOCK(it->world, lock_table);
     }
+}
+
+static void flecs_observers_invoke_intern(
+    ecs_world_t *world,
+    ecs_map_t *observers,
+    ecs_iter_t *it,
+    ecs_table_t *table,
+    ecs_entity_t trav,
+    flecs_observers_invoke_mode_t mode)
+{
+    ecs_assert(it->table == table, ECS_INTERNAL_ERROR, NULL);
+    flecs_observers_deliver(world, observers, it,
+        flecs_observer_lock_table(it, table), trav, mode, NULL, NULL, NULL);
 }
 
 void flecs_observers_invoke(

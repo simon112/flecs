@@ -604,6 +604,7 @@ static void flecs_world_allocators_fini(
     flecs_ballocator_fini(&a->sparse_chunk);
     ecs_vec_fini_t(
         &world->allocator, &world->allocators.tree_spawner, ecs_entity_t);
+    flecs_emit_fini(world);
 
     flecs_allocator_fini(&world->allocator);
 }
@@ -1255,6 +1256,7 @@ void flecs_increment_table_version(
     ecs_assert(table != NULL, ECS_INVALID_PARAMETER, NULL);
 
     world->table_version[table->id & ECS_TABLE_VERSION_ARRAY_BITMASK] ++;
+    world->storage_version ++;
     table->version ++;
 }
 
@@ -1358,6 +1360,7 @@ void ecs_run_aperiodic(
     ecs_flags32_t flags)
 {
     flecs_poly_assert(world, ecs_world_t);
+    flecs_world_write_barrier(world);
 
     if ((flags & EcsAperiodicEmptyQueries)) {
         flecs_process_empty_queries(world);
@@ -1369,6 +1372,7 @@ int32_t ecs_delete_empty_tables(
     const ecs_delete_empty_tables_desc_t *desc)
 {
     flecs_poly_assert(world, ecs_world_t);
+    flecs_world_write_barrier(world);
 
     ecs_os_perf_trace_push("flecs.delete_empty_tables");
 
@@ -1502,6 +1506,8 @@ static bool flecs_component_record_in_use(
 void ecs_shrink(
     ecs_world_t *world)
 {
+    flecs_poly_assert(world, ecs_world_t);
+    flecs_world_write_barrier(world);
     /* This can invalidate ecs_record_t pointers for entities that are no longer
      * alive. If you're sure an application doesn't store any ecs_record_t ptrs
      * or ecs_ref_t's for not-alive entities, you can uncomment this line. */

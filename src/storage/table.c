@@ -1222,6 +1222,8 @@ void ecs_table_clear_entities(
     ecs_world_t* world,
     ecs_table_t* table)
 {
+    flecs_world_write_barrier(world);
+    flecs_storage_change(world);
     flecs_table_fini_data(world, table, true, false);
 }
 
@@ -1239,6 +1241,7 @@ void flecs_table_fini(
     ecs_world_t *world,
     ecs_table_t *table)
 {
+    flecs_storage_change(world);
     flecs_poly_assert(world, ecs_world_t);
 
     flecs_increment_table_version(world, table);
@@ -1602,6 +1605,7 @@ void flecs_table_append(
     bool construct,
     bool on_add)
 {
+    flecs_storage_change(world);
     flecs_table_grow_data(world, table, 1, &entity, construct, on_add);
 }
 
@@ -1629,6 +1633,7 @@ void flecs_table_delete(
     int32_t row,
     bool destruct)
 {
+    flecs_storage_change(world);
     ecs_assert(world != NULL, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(table != NULL, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(!table->_->lock, ECS_LOCKED_STORAGE, 
@@ -1797,6 +1802,7 @@ void flecs_table_move(
     int32_t src_index,
     ecs_id_t emplace_id)
 {
+    flecs_storage_change(world);
     ecs_assert(dst_table != NULL, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(src_table != NULL, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(!dst_table->_->lock, ECS_LOCKED_STORAGE, FLECS_LOCKED_STORAGE_MSG("move"));
@@ -1900,6 +1906,7 @@ int32_t flecs_table_appendn(
     int32_t to_add,
     const ecs_entity_t *ids)
 {
+    flecs_storage_change(world);
     ecs_assert(!table->_->lock, ECS_LOCKED_STORAGE, 
         FLECS_LOCKED_STORAGE_MSG("table bulk append"));
 
@@ -1924,6 +1931,7 @@ bool flecs_table_shrink(
     ecs_world_t *world,
     ecs_table_t *table)
 {
+    flecs_storage_change(world);
     ecs_assert(table != NULL, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(!table->_->lock, ECS_LOCKED_STORAGE, 
         FLECS_LOCKED_STORAGE_MSG("table shrink"));
@@ -1990,6 +1998,7 @@ static void flecs_table_swap(
     int32_t row_1,
     int32_t row_2)
 {    
+    flecs_storage_change(world);
     (void)world;
 
     ecs_assert(!table->_->lock, ECS_LOCKED_STORAGE, 
@@ -2078,6 +2087,7 @@ void flecs_table_merge(
     ecs_table_t *dst_table,
     ecs_table_t *src_table)
 {
+    flecs_storage_change(world);
     ecs_assert(!src_table->_->lock, ECS_LOCKED_STORAGE,
         FLECS_LOCKED_STORAGE_MSG("table merge"));
     ecs_assert(!dst_table->_->lock, ECS_LOCKED_STORAGE,
@@ -2657,6 +2667,7 @@ void ecs_table_swap_rows(
     int32_t row_1,
     int32_t row_2)
 {
+    flecs_world_write_barrier(world);
     flecs_table_swap(world, table, row_1, row_2);
 }
 

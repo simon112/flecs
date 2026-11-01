@@ -413,7 +413,7 @@ static ecs_query_t* flecs_query_init(
     }
 
     if (result->pub.cache_kind != EcsQueryCacheNone) {
-        flecs_check_exclusive_world_access_write(result->pub.world);
+        flecs_world_write_barrier(result->pub.world);
         if (stage != world->stages[0]) {
             flecs_commands_begin(world, world->stages[0]);
             main_scope = true;
@@ -467,7 +467,7 @@ ecs_query_t* ecs_query_init(
     ecs_query_t *result = NULL;
     ecs_entity_t entity = const_desc->entity;
     if (entity) {
-        flecs_check_exclusive_world_access_write(ecs_get_world(world));
+        flecs_world_write_barrier(ecs_get_world(world));
         ecs_check(!ecs_has_pair(world, entity, ecs_id(EcsPoly), EcsQuery),
             ECS_INVALID_OPERATION,
             "entity %s already is a query, use ecs_query_update() to modify",
@@ -494,7 +494,7 @@ ecs_query_t* ecs_query_update(
         ECS_INVALID_PARAMETER,
         "ecs_query_desc_t::entity does not match query entity");
 
-    flecs_check_exclusive_world_access_write(ecs_get_world(world));
+    flecs_world_write_barrier(ecs_get_world(world));
 
     /* Remove the existing query if any. */
     ecs_remove_pair(ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world)),

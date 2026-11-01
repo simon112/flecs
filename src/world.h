@@ -12,6 +12,8 @@
 /* The number of table versions to split tables across */
 #define ECS_TABLE_VERSION_ARRAY_SIZE (ECS_TABLE_VERSION_ARRAY_BITMASK + 1)
 
+typedef struct flecs_emit_walk_t flecs_emit_walk_t;
+
 /* World-level allocators are for operations that are not multithreaded */
 typedef struct ecs_world_allocators_t {
     ecs_block_allocator_t component_record;
@@ -20,6 +22,13 @@ typedef struct ecs_world_allocators_t {
 
     /* Temporary vector for tree spawner */
     ecs_vec_t tree_spawner;
+
+    /* Deliveries planned by the outermost event, kept between events */
+    ecs_vec_t emit_deliveries;
+    ecs_vec_t emit_targets;
+    ecs_vec_t emit_walk_stack;
+    ecs_vec_t emit_freed;           /* Event records freed during an event */
+    bool emit_plan_used;
 } ecs_world_allocators_t;
 
 /* Data stored for id marked for deletion */
@@ -113,6 +122,21 @@ struct ecs_world_t {
      * cached pointer is still valid. */
     uint32_t table_version[ECS_TABLE_VERSION_ARRAY_SIZE];
 
+    /* Bumped by every change that can move an entity or change what it
+     * inherits: the rows of any table, a non-fragmenting hierarchy, a
+     * DontFragment component; and by freeing a component record. While it is
+     * unchanged, an event's deliveries are where they were planned, and the
+     * records it holds are alive. */
+    uint64_t storage_version;
+
+    /* The propagation walks of the events in progress, innermost first. A
+     * walk reads storage between observer calls until the first write, which
+     * captures it (flecs_world_write_barrier). */
+    flecs_emit_walk_t *emit_walk;
+
+    /* The number of events being delivered */
+    int32_t emit_depth;
+
     /* Array for checking if components can be looked up trivially */
     ecs_flags8_t non_trivial_lookup[FLECS_HI_COMPONENT_ID];
 
@@ -186,6 +210,32 @@ struct ecs_world_t {
 
     ecs_vec_t fini_actions;          /* Callbacks to execute when world exits */
 };
+/* Captures the open propagation walks: called before a write changes storage
+ * while an event is being delivered. */
+void flecs_emit_walks_capture(
+    ecs_world_t *world);
+
+/* The write barrier. Every operation that can change storage calls it before
+ * it changes anything; it is where upstream checks exclusive world access.
+ * While an event walks storage across observer calls, the first write plans
+ * the rest of the walk by entity id, before the write moves anything. */
+#define flecs_world_write_barrier(world_arg) do {\
+        const ecs_world_t *wb_world_ = (world_arg);\
+        if (wb_world_->emit_walk) {\
+            flecs_emit_walks_capture(ECS_CONST_CAST(ecs_world_t*, wb_world_));\
+        }\
+        flecs_check_exclusive_world_access_write(wb_world_);\
+    } while (0)
+
+#ifdef FLECS_DEBUG
+/* Storage changes only after the write barrier captured any open walk. */
+void flecs_emit_walks_assert_captured(
+    const ecs_world_t *world);
+#define flecs_storage_change(world) flecs_emit_walks_assert_captured(world)
+#else
+#define flecs_storage_change(world)
+#endif
+
 
 /* Get current stage. */
 ecs_stage_t* flecs_stage_from_world(

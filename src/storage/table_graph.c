@@ -436,7 +436,8 @@ static ecs_table_t *flecs_table_new(
     flecs_hashmap_result_t table_elem,
     ecs_table_t *prev)
 {
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
+    flecs_storage_change(world);
 
     ecs_os_perf_trace_push("flecs.table.create");
 

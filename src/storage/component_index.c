@@ -686,6 +686,10 @@ static void flecs_component_free(
     flecs_bfree_w_dbg_info(&world->allocators.component_record, 
         cr, "ecs_component_record_t");
 
+    /* An event in progress holds records across observer calls: it fetches
+     * them again when the version changed */
+    world->storage_version ++;
+
     if (ecs_should_log_1()) {
         char *id_str = ecs_id_str(world, id);
         ecs_dbg_1("#[green]component record#[normal] %s #[red]deleted", id_str);
@@ -1010,6 +1014,11 @@ void flecs_components_on_isa_change(
     int32_t i;
     for (i = 0; i < count; i ++) {
         ecs_entity_t component = entities[i];
+        if (!flecs_entities_is_alive(world, component)) {
+            /* Deleted by an observer of the event that changed its bases */
+            continue;
+        }
+
         ecs_record_t *r = flecs_entities_get(world, component);
         ecs_assert(r != NULL, ECS_INTERNAL_ERROR, NULL);
         if (!(r->row & EcsEntityIsId)) {

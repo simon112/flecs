@@ -99,6 +99,9 @@ void flecs_observer_fini(
     ecs_observer_t *observer);
 
 /* Emit event. */
+void flecs_emit_fini(
+    ecs_world_t *world);
+
 void flecs_emit(
     ecs_world_t *world,
     ecs_world_t *stage,
@@ -109,6 +112,38 @@ bool flecs_default_next_callback(
     ecs_iter_t *it);
 
 /* Invoke observers. */
+typedef enum flecs_observers_invoke_mode_t {
+    FlecsObserversInvokeAll,
+    FlecsObserversInvokeUpNotifyOnly,
+    FlecsObserversInvokeSkipUpNotify
+} flecs_observers_invoke_mode_t;
+
+/* Invoked instead of an observer when the storage version changed */
+typedef void (*flecs_observer_moved_t)(
+    ecs_world_t *world,
+    ecs_observer_t *o,
+    void *ctx);
+
+/* Invokes observers, with lock_table locked. If version is set and the
+ * storage version no longer matches it, an observer is passed to moved
+ * instead. */
+void flecs_observers_deliver(
+    ecs_world_t *world,
+    ecs_map_t *observers,
+    ecs_iter_t *it,
+    ecs_table_t *lock_table,
+    ecs_entity_t trav,
+    flecs_observers_invoke_mode_t mode,
+    const uint64_t *version,
+    flecs_observer_moved_t moved,
+    void *moved_ctx);
+
+void flecs_observer_invoke_one(
+    ecs_world_t *world,
+    ecs_observer_t *o,
+    ecs_iter_t *it,
+    ecs_entity_t trav);
+
 void flecs_observers_invoke(
     ecs_world_t *world,
     ecs_map_t *observers,

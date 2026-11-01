@@ -109,7 +109,7 @@ ecs_entity_t flecs_new_id(
 {
     flecs_poly_assert(world, ecs_world_t);
 
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     /* It is possible that the world passed to this function is a stage, so
      * make sure we have the actual world. Cast away const since this is one of
@@ -720,7 +720,7 @@ ecs_entity_t ecs_new_low_id(
 
     flecs_stage_from_world(&world);
 
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     ecs_entity_t e = 0;
     if (world->info.last_component_id < FLECS_HI_COMPONENT_ID) {
@@ -1081,7 +1081,7 @@ const ecs_entity_t* ecs_bulk_init(
     ecs_check(desc->_canary == 0, ECS_INVALID_PARAMETER,
         "ecs_bulk_desc_t is uninitialized, set to {0} before using");
 
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     const ecs_entity_t *entities = desc->entities;
     int32_t count = desc->count;
@@ -1862,7 +1862,7 @@ void flecs_modified_id_if(
     flecs_assert_component_valid(world, entity, component, "modified");
 
     flecs_poly_assert(world, ecs_world_t);
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     ecs_record_t *r = flecs_entities_get(world, entity);
     ecs_table_t *table = r->table;
@@ -1936,7 +1936,7 @@ void flecs_set_id_move(
     void *ptr,
     ecs_cmd_kind_t cmd_kind)
 {
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     ecs_record_t *r = flecs_entities_get(world, entity);
     flecs_component_ptr_t dst = flecs_ensure(
@@ -2132,7 +2132,7 @@ void ecs_set_child_order(
 
     flecs_stage_from_world(&world);
 
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     flecs_ordered_children_reorder(world, parent, children, child_count);
 
@@ -2755,7 +2755,7 @@ void ecs_make_alive(
     /* Const cast is safe, function checks for threading */
     world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world));
 
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     /* The entity index can be mutated while in staged/readonly mode, as long as
      * the world is not multithreaded. */
@@ -2866,7 +2866,7 @@ void ecs_set_version(
         "cannot change generation for entity %u through a stage",
             (uint32_t)entity_with_generation);
 
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     flecs_entities_make_alive(world, entity_with_generation);
 

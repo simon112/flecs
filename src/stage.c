@@ -22,7 +22,7 @@ static void flecs_stage_merge(
 {
     bool is_stage = flecs_poly_is(world, ecs_stage_t);
     ecs_stage_t *stage = flecs_stage_from_world(&world);
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     bool measure_frame_time = ECS_BIT_IS_SET(ecs_world_get_flags(world), 
         EcsWorldMeasureFrameTime);

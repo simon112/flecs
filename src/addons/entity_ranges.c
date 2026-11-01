@@ -234,7 +234,7 @@ ecs_entity_t ecs_new_from_range(
 
     flecs_stage_from_world(&world);
 
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
 
     ecs_check(!(world->flags & EcsWorldMultiThreaded),
         ECS_INVALID_OPERATION, "cannot create entities in multithreaded mode");

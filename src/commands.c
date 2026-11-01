@@ -127,7 +127,7 @@ bool flecs_defer_cmd(
     if (deferred) {
         return true;
     }
-    flecs_check_exclusive_world_access_write(stage->world);
+    flecs_world_write_barrier(stage->world);
     flecs_commands_begin(stage->world, stage);
     return false;
 }
@@ -1308,7 +1308,7 @@ bool flecs_commands_flush(
     if (!ecs_vec_count(&commands->queue)) {
         return false;
     }
-    flecs_check_exclusive_world_access_write(world);
+    flecs_world_write_barrier(world);
     ecs_stage_t *dst_stage = world->stages[0];
     ecs_commands_t *root = commands;
     ecs_vec_t *queue;

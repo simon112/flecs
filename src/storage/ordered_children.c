@@ -75,9 +75,13 @@ void flecs_ordered_entities_append(
     ecs_component_record_t *cr,
     ecs_entity_t e)
 {
+    flecs_storage_change(world);
     ecs_vec_t *vec = &cr->pair->ordered_children;
     ecs_vec_init_if_t(vec, ecs_entity_t);
     ecs_vec_append_t(&world->allocator, vec, ecs_entity_t)[0] = e;
+
+    /* A child that changes parent stays in its table */
+    world->storage_version ++;
 
     if (cr->flags & EcsIdPrefabChildren) {
         /* Register index of prefab child so that it can be used to lookup
@@ -98,6 +102,7 @@ void flecs_ordered_entities_remove(
     ecs_component_record_t *cr,
     ecs_entity_t e)
 {
+    flecs_storage_change(world);
     ecs_vec_t *vec = &cr->pair->ordered_children;
     int32_t i, count = ecs_vec_count(vec);
     ecs_entity_t *entities = ecs_vec_first_t(vec, ecs_entity_t);
@@ -111,6 +116,7 @@ void flecs_ordered_entities_remove(
     ecs_assert(i != count, ECS_INTERNAL_ERROR, NULL);
 
     ecs_vec_remove_ordered_t(vec, ecs_entity_t, i);
+    world->storage_version ++;
     if (cr->flags & EcsIdPrefabChildren) {
         ecs_map_remove(&world->prefab_child_indices, e);
     }
@@ -120,6 +126,7 @@ void flecs_ordered_children_set_prefab(
     ecs_world_t *world,
     ecs_component_record_t *cr)
 {
+    flecs_storage_change(world);
     if (cr->flags & EcsIdPrefabChildren) {
         return;
     }
@@ -155,6 +162,7 @@ void flecs_ordered_children_reparent(
     int32_t row,
     int32_t count)
 {
+    flecs_storage_change(world);
     const ecs_entity_t *entities = &ecs_table_entities(dst)[row];
 
     if (src && (src->flags & EcsTableHasOrderedChildren)) {
@@ -176,6 +184,7 @@ void flecs_ordered_children_unparent(
     int32_t row,
     int32_t count)
 {
+    flecs_storage_change(world);
     ecs_assert(src->flags & EcsTableHasOrderedChildren,
         ECS_INTERNAL_ERROR, NULL);
 
@@ -189,6 +198,7 @@ void flecs_ordered_children_reorder(
     const ecs_entity_t *children,
     int32_t child_count)
 {
+    flecs_storage_change(world);
     ecs_component_record_t *cr = flecs_components_get(
         world, ecs_childof(parent));
 
